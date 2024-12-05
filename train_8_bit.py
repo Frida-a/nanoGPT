@@ -193,7 +193,8 @@ if block_size < model.config.block_size:
 model.to(device)
 
 from torchviz import make_dot
-make_dot(model, params=dict(list(model.named_parameters()))).render(os.path.join(out_dir, 'model'), format="pdf")
+dummy_input = torch.zeros(1, block_size, dtype=torch.long).to(device)
+make_dot(model(dummy_input), params=dict(list(model.named_parameters()))).render(os.path.join(out_dir, 'model'), format="pdf")
 
 # # initialize a GradScaler. If enabled=False scaler is a no-op
 # scaler = torch.cuda.amp.GradScaler(enabled=(dtype == 'float16'))
