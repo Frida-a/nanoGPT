@@ -15,8 +15,7 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
-import bitsandbytes as bnb
-from bnb.nn import Linear8bitLt
+from bitsandbytes.nn import Linear8bitLt
 
 class LayerNorm(nn.Module):
     """ LayerNorm but with an optional bias. PyTorch doesn't support simply bias=False """
