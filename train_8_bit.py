@@ -29,6 +29,8 @@ from torch.distributed import init_process_group, destroy_process_group
 
 from model import GPTConfig, GPT
 
+from model_8_bit import GPT_8_bit
+
 # -----------------------------------------------------------------------------
 # default config values designed to train a gpt2 (124M) on OpenWebText
 # I/O
@@ -155,6 +157,7 @@ if init_from == 'scratch':
     model_args['vocab_size'] = meta_vocab_size if meta_vocab_size is not None else 50304
     gptconf = GPTConfig(**model_args)
     model = GPT(gptconf)
+    quantized_model = GPT_8_bit(gptconf)
 elif init_from == 'resume':
     print(f"Resuming training from {out_dir}")
     # resume training from a checkpoint.
@@ -168,6 +171,7 @@ elif init_from == 'resume':
     # create the model
     gptconf = GPTConfig(**model_args)
     model = GPT(gptconf)
+    quantized_model = GPT_8_bit(gptconf)
     state_dict = checkpoint['model']
     # fix the keys of the state dictionary :(
     # honestly no idea how checkpoints sometimes get this prefix, have to debug more
@@ -192,7 +196,15 @@ if block_size < model.config.block_size:
     model_args['block_size'] = block_size # so that the checkpoint will have the right value
 model.to(device)
 
+print("before quantizing")
 print(model)
+print()
+print("after quantizing")
+
+quantized_model.load_state_dict(model.state_dict())
+quantized_model.to(device)
+print(quantized_model)
+
 
 # # initialize a GradScaler. If enabled=False scaler is a no-op
 # scaler = torch.cuda.amp.GradScaler(enabled=(dtype == 'float16'))

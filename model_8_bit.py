@@ -15,6 +15,9 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
+import bitsandbytes as bnb
+from bnb.nn import Linear8bitLt
+
 class LayerNorm(nn.Module):
     """ LayerNorm but with an optional bias. PyTorch doesn't support simply bias=False """
 
@@ -32,9 +35,9 @@ class CausalSelfAttention(nn.Module):
         super().__init__()
         assert config.n_embd % config.n_head == 0
         # key, query, value projections for all heads, but in a batch
-        self.c_attn = nn.Linear(config.n_embd, 3 * config.n_embd, bias=config.bias)
+        self.c_attn = Linear8bitLt(config.n_embd, 3 * config.n_embd, bias=config.bias, has_fp16_weights=False)
         # output projection
-        self.c_proj = nn.Linear(config.n_embd, config.n_embd, bias=config.bias)
+        self.c_proj = Linear8bitLt(config.n_embd, config.n_embd, bias=config.bias, has_fp16_weights=False)
         # regularization
         self.attn_dropout = nn.Dropout(config.dropout)
         self.resid_dropout = nn.Dropout(config.dropout)
@@ -79,9 +82,9 @@ class MLP(nn.Module):
 
     def __init__(self, config):
         super().__init__()
-        self.c_fc    = nn.Linear(config.n_embd, 4 * config.n_embd, bias=config.bias)
+        self.c_fc    = Linear8bitLt(config.n_embd, 4 * config.n_embd, bias=config.bias, has_fp16_weights=False)
         self.gelu    = nn.GELU()
-        self.c_proj  = nn.Linear(4 * config.n_embd, config.n_embd, bias=config.bias)
+        self.c_proj  = Linear8bitLt(4 * config.n_embd, config.n_embd, bias=config.bias, has_fp16_weights=False)
         self.dropout = nn.Dropout(config.dropout)
 
     def forward(self, x):
@@ -130,7 +133,7 @@ class GPT(nn.Module):
             h = nn.ModuleList([Block(config) for _ in range(config.n_layer)]),
             ln_f = LayerNorm(config.n_embd, bias=config.bias),
         ))
-        self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
+        self.lm_head = Linear8bitLt(config.n_embd, config.vocab_size, bias=False, has_fp16_weights=False)
         # with weight tying when using torch.compile() some warnings get generated:
         # "UserWarning: functional_call was passed multiple values for tied weights.
         # This behavior is deprecated and will be an error in future versions"
@@ -160,7 +163,7 @@ class GPT(nn.Module):
         return n_params
 
     def _init_weights(self, module):
-        if isinstance(module, nn.Linear):
+        if isinstance(module, Linear8bitLt):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
             if module.bias is not None:
                 torch.nn.init.zeros_(module.bias)
