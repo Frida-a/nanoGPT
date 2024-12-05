@@ -204,6 +204,8 @@ print("after quantizing")
 quantized_model.load_state_dict(model.state_dict())
 quantized_model.to(device)
 print(quantized_model)
+for param in quantized_model.parameters():
+    print(param.data.dtype)
 
 
 # # initialize a GradScaler. If enabled=False scaler is a no-op
