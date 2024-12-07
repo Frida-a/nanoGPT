@@ -1,6 +1,6 @@
 import time
 
-out_dir = 'out-shakespeare'
+# out_dir = 'out-shakespeare'
 eval_interval = 5
 eval_iters = 40
 wandb_log = False # feel free to turn on
@@ -18,7 +18,7 @@ always_save_checkpoint = False
 # shakespeare has 301,966 tokens, so 1 epoch ~= 9.2 iters
 batch_size = 1
 gradient_accumulation_steps = 32
-max_iters = 20
+max_iters = 40
 
 # finetune at constant LR
 learning_rate = 3e-5
