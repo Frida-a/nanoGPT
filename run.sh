@@ -8,3 +8,5 @@ python train-moe.py config/train_shakespeare_char_moe.py --compile=False
 
 # TODO: training from scratch using 
 
+# mxfp4
+python train.py config/train_shakespeare_char_mxfp4.py --compile=False
