@@ -1,3 +1,5 @@
+#!/bin/bash
+
 #### Training quantized model from scratch with Int8
 
 scratch_out_dir = "out/richard/from-scratch"
