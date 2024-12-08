@@ -4,7 +4,7 @@ from torch.nn import functional as F
 import torch
 import inspect
 from dataclasses import dataclass
-from quantization import MXFp4QuantLinear
+# from quantization import MXFp4QuantLinear
 from bitsandbytes.nn import Linear8bitLt
 
 
@@ -38,11 +38,11 @@ class MoeLayer(nn.Module):
 class Head(nn.Module):
     def __init__(self, head_size, n_embed, block_size, dropout, quant_format):
         super().__init__()
-        if quant_format == 'mxfp4':
-            self.key = MXFp4QuantLinear(n_embed, head_size, bias = False)
-            self.query = MXFp4QuantLinear(n_embed, head_size, bias = False)
-            self.value = MXFp4QuantLinear(n_embed, head_size, bias = False)
-        elif quant_format == '8bit':
+        # if quant_format == 'mxfp4':
+        #     self.key = MXFp4QuantLinear(n_embed, head_size, bias = False)
+        #     self.query = MXFp4QuantLinear(n_embed, head_size, bias = False)
+        #     self.value = MXFp4QuantLinear(n_embed, head_size, bias = False)
+        if quant_format == '8bit':
             self.key = Linear8bitLt(n_embed, head_size, bias = False, has_fp16_weights=False)
             self.query = Linear8bitLt(n_embed, head_size, bias = False, has_fp16_weights=False)
             self.value = Linear8bitLt(n_embed, head_size, bias = False, has_fp16_weights=False)
@@ -69,9 +69,9 @@ class MulitHeadAttention(nn.Module):
     def __init__(self, num_heads, head_size, n_embed, block_size, dropout, quant_format):
         super().__init__()
         self.heads = nn.ModuleList([Head(head_size, n_embed, block_size, dropout, quant_format) for _ in range(num_heads)])
-        if quant_format == 'mxfp4':
-            self.proj = MXFp4QuantLinear(n_embed, n_embed)
-        elif quant_format == '8bit':
+        # if quant_format == 'mxfp4':
+        #     self.proj = MXFp4QuantLinear(n_embed, n_embed)
+        if quant_format == '8bit':
             self.proj = Linear8bitLt(n_embed, n_embed, has_fp16_weights=False)
         else:
             self.proj = nn.Linear(n_embed, n_embed)
@@ -86,13 +86,13 @@ class MulitHeadAttention(nn.Module):
 class FeedForward(nn.Module):
     def __init__(self, n_embed, dropout, quant_format):
         super().__init__()
-        if quant_format == 'mxfp4':
-            self.net = nn.Sequential(
-                MXFp4QuantLinear(n_embed, 4* n_embed),
-                nn.ReLU(),
-                MXFp4QuantLinear(4 * n_embed, n_embed),
-            nn.Dropout(dropout))
-        elif quant_format == '8bit':
+        # if quant_format == 'mxfp4':
+        #     self.net = nn.Sequential(
+        #         MXFp4QuantLinear(n_embed, 4* n_embed),
+        #         nn.ReLU(),
+        #         MXFp4QuantLinear(4 * n_embed, n_embed),
+        #     nn.Dropout(dropout))
+        if quant_format == '8bit':
             self.net = nn.Sequential(
                 Linear8bitLt(n_embed, 4* n_embed, has_fp16_weights=False),
                 nn.ReLU(),
@@ -113,12 +113,12 @@ class Block(nn.Module):
         super().__init__()
         self.sa_head= MulitHeadAttention(config.n_head, config.n_embed//config.n_head, config.n_embed, config.block_size, config.dropout, config.quant_format)
         if config.quantize_gate:
-            if config.quant_format == 'mxfp4':
-                self.ffw = MoeLayer(
-                    experts=[FeedForward(config.n_embed, config.dropout, config.quant_format) for _ in range(config.num_experts)],
-                    gate=MXFp4QuantLinear(config.n_embed, config.num_experts, bias=False),
-                )
-            elif config.quant_format == '8bit':
+            # if config.quant_format == 'mxfp4':
+            #     self.ffw = MoeLayer(
+            #         experts=[FeedForward(config.n_embed, config.dropout, config.quant_format) for _ in range(config.num_experts)],
+            #         gate=MXFp4QuantLinear(config.n_embed, config.num_experts, bias=False),
+            #     )
+            if config.quant_format == '8bit':
                 self.ffw = MoeLayer(
                     experts=[FeedForward(config.n_embed, config.dropout, config.quant_format) for _ in range(config.num_experts)],
                     gate=Linear8bitLt(config.n_embed, config.num_experts, bias=False, has_fp16_weights=False),
@@ -163,9 +163,9 @@ class MOE(nn.Module):
         self.position_embedding_table = nn.Embedding(config.block_size, config.n_embed, device=config.device)
         self.blocks = nn.Sequential(*[Block(config) for _ in range(config.n_layer)])
         if config.quantize_head:
-            if config.quant_format == 'mxfp4':
-                self.lm_head = MXFp4QuantLinear(config.n_embed, config.vocab_size)
-            elif config.quant_format == '8bit':
+            # if config.quant_format == 'mxfp4':
+            #     self.lm_head = MXFp4QuantLinear(config.n_embed, config.vocab_size)
+            if config.quant_format == '8bit':
                 self.lm_head = Linear8bitLt(config.n_embed, config.vocab_size, has_fp16_weights=False)
         else:
             self.lm_head = nn.Linear(config.n_embed, config.vocab_size)
