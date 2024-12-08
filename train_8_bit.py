@@ -208,6 +208,7 @@ quantized_model.to(device)
 # for param in quantized_model.parameters():
 #     print(param.data.dtype)
 
+print(quantized_model)
 
 # initialize a GradScaler. If enabled=False scaler is a no-op
 scaler = torch.cuda.amp.GradScaler(enabled=(dtype == 'float16'))
