@@ -2,7 +2,7 @@
 # good for debugging and playing on macbooks and such
 
 quant_format = '8bit' # 8-bit quantization
-quantize_gate = False
+quantize_gate = True
 quantize_head = False
 
 # out_dir = 'out/richard/out-shakespeare-char-8-bit'
