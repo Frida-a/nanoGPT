@@ -28,7 +28,15 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
 
 from model import GPTConfig, GPT
-from moe import Transformer
+# from moe import MOETransformer, MOEConfig
+from mxfp4_moe import MOE, MOEConfig
+
+
+is_moe = True
+# mxfp4_quant = False
+quant_format = None
+quantize_gate = False
+quantize_head = False
 # -----------------------------------------------------------------------------
 # default config values designed to train a gpt2 (124M) on OpenWebText
 # I/O
@@ -47,7 +55,7 @@ wandb_run_name = 'gpt2' # 'run' + str(time.time())
 dataset = 'openwebtext'
 gradient_accumulation_steps = 5 * 8 # used to simulate larger batch sizes
 batch_size = 12 # if gradient_accumulation_steps > 1, this is the micro-batch size
-block_size = 1024
+block_size = 256
 # model
 n_layer = 12
 n_head = 12
@@ -142,73 +150,72 @@ if os.path.exists(meta_path):
         meta = pickle.load(f)
     meta_vocab_size = meta['vocab_size']
     print(f"found vocab_size = {meta_vocab_size} (inside {meta_path})")
+# 
 
 # model init
 model_args = dict(n_layer=n_layer, n_head=n_head, n_embd=n_embd, block_size=block_size,
-                  bias=bias, vocab_size=None, dropout=dropout) # start with model_args from command line
-# if init_from == 'scratch':
-#     # init a new model from scratch
-#     print("Initializing a new model from scratch")
-#     # determine the vocab size we'll use for from-scratch training
-#     if meta_vocab_size is None:
-#         print("defaulting to vocab_size of GPT-2 to 50304 (50257 rounded up for efficiency)")
-#     model_args['vocab_size'] = meta_vocab_size if meta_vocab_size is not None else 50304
-#     gptconf = GPTConfig(**model_args)
-#     model = GPT(gptconf)
-# elif init_from == 'resume':
-#     print(f"Resuming training from {out_dir}")
-#     # resume training from a checkpoint.
-#     ckpt_path = os.path.join(out_dir, 'ckpt.pt')
-#     checkpoint = torch.load(ckpt_path, map_location=device)
-#     checkpoint_model_args = checkpoint['model_args']
-#     # force these config attributes to be equal otherwise we can't even resume training
-#     # the rest of the attributes (e.g. dropout) can stay as desired from command line
-#     for k in ['n_layer', 'n_head', 'n_embd', 'block_size', 'bias', 'vocab_size']:
-#         model_args[k] = checkpoint_model_args[k]
-#     # create the model
-#     gptconf = GPTConfig(**model_args)
-#     model = GPT(gptconf)
-#     state_dict = checkpoint['model']
-#     # fix the keys of the state dictionary :(
-#     # honestly no idea how checkpoints sometimes get this prefix, have to debug more
-#     unwanted_prefix = '_orig_mod.'
-#     for k,v in list(state_dict.items()):
-#         if k.startswith(unwanted_prefix):
-#             state_dict[k[len(unwanted_prefix):]] = state_dict.pop(k)
-#     model.load_state_dict(state_dict)
-#     iter_num = checkpoint['iter_num']
-#     best_val_loss = checkpoint['best_val_loss']
-# elif init_from.startswith('gpt2'):
-#     print(f"Initializing from OpenAI GPT-2 weights: {init_from}")
-#     # initialize from OpenAI GPT-2 weights
-#     override_args = dict(dropout=dropout)
-#     model = GPT.from_pretrained(init_from, override_args)
-#     # read off the created config params, so we can store them into checkpoint correctly
-#     for k in ['n_layer', 'n_head', 'n_embd', 'block_size', 'bias', 'vocab_size']:
-#         model_args[k] = getattr(model.config, k)
-# # crop down the model block size if desired, using model surgery
-# if block_size < model.config.block_size:
-#     model.crop_block_size(block_size)
-#     model_args['block_size'] = block_size # so that the checkpoint will have the right value
+                  bias=bias, vocab_size=None, dropout=dropout, quant_format=quant_format, quantize_gate=quantize_gate, quantize_head=quantize_head) # start with model_args from command line
+if init_from == 'scratch':
+    # init a new model from scratch
+    print("Initializing a new model from scratch")
+    # determine the vocab size we'll use for from-scratch training
+    if meta_vocab_size is None:
+        print("defaulting to vocab_size of GPT-2 to 50304 (50257 rounded up for efficiency)")
+    model_args['vocab_size'] = meta_vocab_size if meta_vocab_size is not None else 50304
+    if is_moe:
+        
+        moeconf = MOEConfig(**model_args)
+        model = MOE(moeconf)
+        # if quant_format == "mxfp4" :
+        #     model = MXFP4MOE(moeconf)
+        # else:
+        #     model = MOETransformer(moeconf)
+    else:
+        gptconf = GPTConfig(**model_args)
+        model = GPT(gptconf)
+    model.to(device)
+    print(f"Start to train model: {model}")
+elif init_from == 'resume':
+    print(f"Resuming training from {out_dir}")
+    # resume training from a checkpoint.
+    ckpt_path = os.path.join(out_dir, 'ckpt.pt')
+    checkpoint = torch.load(ckpt_path, map_location=device)
+    checkpoint_model_args = checkpoint['model_args']
+    # force these config attributes to be equal otherwise we can't even resume training
+    # the rest of the attributes (e.g. dropout) can stay as desired from command line
+    for k in ['n_layer', 'n_head', 'n_embd', 'block_size', 'bias', 'vocab_size']:
+        model_args[k] = checkpoint_model_args[k]
+    # create the model
+    gptconf = GPTConfig(**model_args)
+    model = GPT(gptconf)
+    state_dict = checkpoint['model']
+    # fix the keys of the state dictionary :(
+    # honestly no idea how checkpoints sometimes get this prefix, have to debug more
+    unwanted_prefix = '_orig_mod.'
+    for k,v in list(state_dict.items()):
+        if k.startswith(unwanted_prefix):
+            state_dict[k[len(unwanted_prefix):]] = state_dict.pop(k)
+    model.load_state_dict(state_dict)
+    iter_num = checkpoint['iter_num']
+    best_val_loss = checkpoint['best_val_loss']
+elif init_from.startswith('gpt2'):
+    print(f"Initializing from OpenAI GPT-2 weights: {init_from}")
+    # initialize from OpenAI GPT-2 weights
+    override_args = dict(dropout=dropout)
+    model = GPT.from_pretrained(init_from, override_args)
+    # read off the created config params, so we can store them into checkpoint correctly
+    for k in ['n_layer', 'n_head', 'n_embd', 'block_size', 'bias', 'vocab_size']:
+        model_args[k] = getattr(model.config, k)
+# crop down the model block size if desired, using model surgery
+if block_size < model.config.block_size:
+    model.crop_block_size(block_size)
+    model_args['block_size'] = block_size # so that the checkpoint will have the right value
 
-# (self, vocab_size, n_embed, n_head, block_size, n_layer):
-# # hyperparameters
-# batch_size = 64 # independent sequences processed in parallel
-block_size = 256 # max context length
-# max_iters = 3000 
-# eval_interval = 100
-# learning_rate = 1e-3
-# eval_iters = 200
-n_embd = 384
-n_embed = 384
-n_head = 6
-n_layer = 6
-# dropout = 0.0
 
 # # set device
-# device = 'cuda' if torch.cuda.is_available() else 'cpu'
-model = Transformer(vocab_size=meta_vocab_size, n_embed=n_embed, n_embd=n_embd, n_head=n_head, block_size=block_size, n_layer=n_layer, device=device)
-model.to(device)
+# # device = 'cuda' if torch.cuda.is_available() else 'cpu'
+# model = MOETransformer(vocab_size=meta_vocab_size, n_embed=n_embed, n_embd=n_embd, n_head=n_head, block_size=block_size, n_layer=n_layer, device=device)
+# model.to(device)
 
 # initialize a GradScaler. If enabled=False scaler is a no-op
 scaler = torch.cuda.amp.GradScaler(enabled=(dtype == 'float16'))

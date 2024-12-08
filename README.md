@@ -13,7 +13,12 @@ Because the code is so simple, it is very easy to hack to your needs, train new 
 
 ```
 pip install torch numpy transformers datasets tiktoken wandb tqdm
+
+# for mxfp4
+cd mxfp4_kernel
+pip install .
 ```
+<!-- python -m pip install transformers datasets tiktoken wandb tqdm -i http://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com -->
 
 Dependencies:
 

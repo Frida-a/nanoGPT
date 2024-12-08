@@ -1,7 +1,8 @@
 # train a miniature character-level shakespeare model
 # good for debugging and playing on macbooks and such
 mxfp4_quant= False
-out_dir = 'moe-out-shakespeare-char'
+
+out_dir = 'out-shakespeare-char-mxfp4'
 eval_interval = 250 # keep frequent because we'll overfit
 eval_iters = 200
 log_interval = 10 # don't print too too often
