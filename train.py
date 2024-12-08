@@ -161,6 +161,7 @@ if init_from == 'scratch':
         model = MXFP4GPT(gptconf)
     else:
         model = GPT(gptconf)
+    print(f"Start to train model: {model}")
 elif init_from == 'resume':
     print(f"Resuming training from {out_dir}")
     # resume training from a checkpoint.

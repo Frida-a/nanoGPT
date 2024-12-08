@@ -35,11 +35,16 @@ class MoeLayer(nn.Module):
         return results.view_as(inputs)
 
 class Head(nn.Module):
-    def __init__(self, head_size, n_embed, block_size, dropout):
+    def __init__(self, head_size, n_embed, block_size, dropout, quant_format):
         super().__init__()
-        self.key = MXFp4QuantLinear(n_embed, head_size, bias = False)
-        self.query = MXFp4QuantLinear(n_embed, head_size, bias = False)
-        self.value = MXFp4QuantLinear(n_embed, head_size, bias = False)
+        if quant_format == 'mxfp4':
+            self.key = MXFp4QuantLinear(n_embed, head_size, bias = False)
+            self.query = MXFp4QuantLinear(n_embed, head_size, bias = False)
+            self.value = MXFp4QuantLinear(n_embed, head_size, bias = False)
+        else:
+            self.key = nn.Linear(n_embed, head_size, bias = False)
+            self.query = nn.Linear(n_embed, head_size, bias = False)
+            self.value = nn.Linear(n_embed, head_size, bias = False)
         self.register_buffer('tril', torch.tril(torch.ones(block_size, block_size)))
         self.dropout = nn.Dropout(dropout)
 
@@ -56,10 +61,13 @@ class Head(nn.Module):
         return out
 
 class MulitHeadAttention(nn.Module):
-    def __init__(self, num_heads, head_size, n_embed, block_size, dropout):
+    def __init__(self, num_heads, head_size, n_embed, block_size, dropout, quant_format):
         super().__init__()
-        self.heads = nn.ModuleList([Head(head_size, n_embed, block_size, dropout) for _ in range(num_heads)])
-        self.proj = MXFp4QuantLinear(n_embed, n_embed)
+        self.heads = nn.ModuleList([Head(head_size, n_embed, block_size, dropout, quant_format) for _ in range(num_heads)])
+        if quant_format == 'mxfp4':
+            self.proj = MXFp4QuantLinear(n_embed, n_embed)
+        else:
+            self.proj = nn.Linear(n_embed, n_embed)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
@@ -69,13 +77,20 @@ class MulitHeadAttention(nn.Module):
 
 
 class FeedForward(nn.Module):
-    def __init__(self, n_embed, dropout):
+    def __init__(self, n_embed, dropout, quant_format):
         super().__init__()
-        self.net = nn.Sequential(
-            MXFp4QuantLinear(n_embed, 4* n_embed),
-            nn.ReLU(),
-            MXFp4QuantLinear(4 * n_embed, n_embed),
-         nn.Dropout(dropout))
+        if quant_format == 'mxfp4':
+            self.net = nn.Sequential(
+                MXFp4QuantLinear(n_embed, 4* n_embed),
+                nn.ReLU(),
+                MXFp4QuantLinear(4 * n_embed, n_embed),
+            nn.Dropout(dropout))
+        else:
+            self.net = nn.Sequential(
+                nn.Linear(n_embed, 4* n_embed),
+                nn.ReLU(),
+                nn.Linear(4 * n_embed, n_embed),
+            nn.Dropout(dropout))
 
     def forward(self, x):
         return self.net(x)
@@ -83,11 +98,18 @@ class FeedForward(nn.Module):
 class Block(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.sa_head= MulitHeadAttention(config.n_head, config.n_embed//config.n_head, config.n_embed, config.block_size, config.dropout)
-        self.ffw = MoeLayer(
-            experts=[FeedForward(config.n_embed, config.dropout) for _ in range(config.num_experts)],
-            gate=nn.Linear(config.n_embed, config.num_experts, bias=False),
-        )
+        self.sa_head= MulitHeadAttention(config.n_head, config.n_embed//config.n_head, config.n_embed, config.block_size, config.dropout, config.quant_format)
+        if config.quantize_gate:
+            if config.quant_format == 'mxfp4':
+                self.ffw = MoeLayer(
+                experts=[FeedForward(config.n_embed, config.dropout, config.quant_format) for _ in range(config.num_experts)],
+                gate=MXFp4QuantLinear(config.n_embed, config.num_experts, bias=False),
+            )
+        else:
+            self.ffw = MoeLayer(
+                experts=[FeedForward(config.n_embed, config.dropout, config.quant_format) for _ in range(config.num_experts)],
+                gate=nn.Linear(config.n_embed, config.num_experts, bias=False),
+            )
 
         self.ln1 = nn.LayerNorm(config.n_embed)
         self.ln2 = nn.LayerNorm(config.n_embed)
@@ -110,17 +132,23 @@ class MOEConfig:
     n_embed: int = 384
     device: str = 'cuda'
     num_experts: int = 4
+    quant_format: str = None
+    quantize_gate: bool = False
+    quantize_head: bool = False
 
 
-
-class MXFP4MOE(nn.Module):
+class MOE(nn.Module):
     def __init__(self, config):
         super().__init__()
 
         self.token_embedding_table = nn.Embedding(config.vocab_size, config.n_embed, device=config.device)
         self.position_embedding_table = nn.Embedding(config.block_size, config.n_embed, device=config.device)
         self.blocks = nn.Sequential(*[Block(config) for _ in range(config.n_layer)])
-        self.lm_head = nn.Linear(config.n_embed, config.vocab_size)
+        if config.quantize_head:
+            if config.quant_format == 'mxfp4':
+                self.lm_head = MXFp4QuantLinear(config.n_embed, config.vocab_size)
+        else:
+            self.lm_head = nn.Linear(config.n_embed, config.vocab_size)
         self.config = config
         self.device = config.device
 

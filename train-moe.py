@@ -28,12 +28,15 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
 
 from model import GPTConfig, GPT
-from moe import MOETransformer, MOEConfig
-from mxfp4_moe import MXFP4MOE
+# from moe import MOETransformer, MOEConfig
+from mxfp4_moe import MOE, MOEConfig
 
 
 is_moe = True
-mxfp4_quant = False
+# mxfp4_quant = False
+quant_format = None
+quantize_gate = False
+quantize_head = False
 # -----------------------------------------------------------------------------
 # default config values designed to train a gpt2 (124M) on OpenWebText
 # I/O
@@ -147,10 +150,11 @@ if os.path.exists(meta_path):
         meta = pickle.load(f)
     meta_vocab_size = meta['vocab_size']
     print(f"found vocab_size = {meta_vocab_size} (inside {meta_path})")
+# 
 
 # model init
 model_args = dict(n_layer=n_layer, n_head=n_head, n_embd=n_embd, block_size=block_size,
-                  bias=bias, vocab_size=None, dropout=dropout) # start with model_args from command line
+                  bias=bias, vocab_size=None, dropout=dropout, quant_format=quant_format, quantize_gate=quantize_gate, quantize_head=quantize_head) # start with model_args from command line
 if init_from == 'scratch':
     # init a new model from scratch
     print("Initializing a new model from scratch")
@@ -161,10 +165,11 @@ if init_from == 'scratch':
     if is_moe:
         
         moeconf = MOEConfig(**model_args)
-        if mxfp4_quant:
-            model = MXFP4MOE(moeconf)
-        else:
-            model = MOETransformer(moeconf)
+        model = MOE(moeconf)
+        # if quant_format == "mxfp4" :
+        #     model = MXFP4MOE(moeconf)
+        # else:
+        #     model = MOETransformer(moeconf)
     else:
         gptconf = GPTConfig(**model_args)
         model = GPT(gptconf)
