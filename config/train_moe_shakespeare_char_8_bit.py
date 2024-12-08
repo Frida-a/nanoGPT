@@ -2,7 +2,7 @@
 # good for debugging and playing on macbooks and such
 
 quant_format = '8bit' # 8-bit quantization
-quantize_gate = True
+quantize_gate = False
 quantize_head = False
 
 # out_dir = 'out/richard/out-shakespeare-char-8-bit'
@@ -23,8 +23,8 @@ batch_size = 64
 block_size = 256 # context of up to 256 previous characters
 
 # baby GPT model :)
-n_layer = 6
-n_head = 6
+n_layer = 3
+n_head = 3
 n_embd = 384
 dropout = 0.2
 
