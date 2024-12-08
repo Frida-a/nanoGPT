@@ -29,7 +29,7 @@ from torch.distributed import init_process_group, destroy_process_group
 
 from model import GPTConfig, GPT
 # from moe import MOETransformer, MOEConfig
-from mxfp4_moe import MOE, MOEConfig
+from quant_moe import MOE, MOEConfig
 
 
 is_moe = True
@@ -155,6 +155,12 @@ if os.path.exists(meta_path):
 # model init
 model_args = dict(n_layer=n_layer, n_head=n_head, n_embd=n_embd, block_size=block_size,
                   bias=bias, vocab_size=None, dropout=dropout, quant_format=quant_format, quantize_gate=quantize_gate, quantize_head=quantize_head) # start with model_args from command line
+print()
+print(f"quant_format: {model_args['quant_format']}")
+print(f"quantize_gate: {model_args['quantize_gate']}")
+print(f"quantize_head: {model_args['quantize_head']}")
+print()
+
 if init_from == 'scratch':
     # init a new model from scratch
     print("Initializing a new model from scratch")
