@@ -4,6 +4,7 @@ from torch.nn import functional as F
 import torch
 import inspect
 from dataclasses import dataclass
+from quantization import MXFp4QuantLinear
 
 
 class MoeLayer(nn.Module):
@@ -36,9 +37,9 @@ class MoeLayer(nn.Module):
 class Head(nn.Module):
     def __init__(self, head_size, n_embed, block_size, dropout):
         super().__init__()
-        self.key = nn.Linear(n_embed, head_size, bias = False)
-        self.query = nn.Linear(n_embed, head_size, bias = False)
-        self.value = nn.Linear(n_embed, head_size, bias = False)
+        self.key = MXFp4QuantLinear(n_embed, head_size, bias = False)
+        self.query = MXFp4QuantLinear(n_embed, head_size, bias = False)
+        self.value = MXFp4QuantLinear(n_embed, head_size, bias = False)
         self.register_buffer('tril', torch.tril(torch.ones(block_size, block_size)))
         self.dropout = nn.Dropout(dropout)
 
@@ -58,7 +59,7 @@ class MulitHeadAttention(nn.Module):
     def __init__(self, num_heads, head_size, n_embed, block_size, dropout):
         super().__init__()
         self.heads = nn.ModuleList([Head(head_size, n_embed, block_size, dropout) for _ in range(num_heads)])
-        self.proj = nn.Linear(n_embed, n_embed)
+        self.proj = MXFp4QuantLinear(n_embed, n_embed)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
@@ -71,9 +72,9 @@ class FeedForward(nn.Module):
     def __init__(self, n_embed, dropout):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(n_embed, 4* n_embed),
+            MXFp4QuantLinear(n_embed, 4* n_embed),
             nn.ReLU(),
-            nn.Linear(4 * n_embed, n_embed),
+            MXFp4QuantLinear(4 * n_embed, n_embed),
          nn.Dropout(dropout))
 
     def forward(self, x):
@@ -112,7 +113,7 @@ class MOEConfig:
 
 
 
-class MOETransformer(nn.Module):
+class MXFP4MOE(nn.Module):
     def __init__(self, config):
         super().__init__()
 

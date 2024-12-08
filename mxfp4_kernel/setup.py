@@ -14,7 +14,7 @@ source_cuda = [os.path.join(this_dir,  filename)
 setup(name='mxfp4Quant',
       packages=find_packages(),
       cmdclass={'build_ext': BuildExtension},
-      ext_modules=[CUDAExtension('mxfp4Quant._C', source_cuda ,extra_compile_args={'cxx': ['/std:c++latest'], # 'cxx': ['-g'],
+      ext_modules=[CUDAExtension('mxfp4Quant._C', source_cuda ,extra_compile_args={'cxx': ['-g'], # linux: 'cxx': ['-g'], win: 'cxx': ['/std:c++latest'],
                                           'nvcc': ['-O2']})],)
 
 

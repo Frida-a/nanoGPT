@@ -9,4 +9,12 @@ python train-moe.py config/train_shakespeare_char_moe.py --compile=False
 # TODO: training from scratch using 
 
 # mxfp4
-python train.py config/train_shakespeare_char_mxfp4.py --compile=False
+# shakespeare_char
+# train from scratch
+python train-moe.py config/train_shakespeare_char_moe_mxfp4.py --compile=False
+
+# train from scratch moe
+
+
+# exper:
+# whether to quantize linear layer in gate
