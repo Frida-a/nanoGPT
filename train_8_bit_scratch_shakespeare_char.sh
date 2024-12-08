@@ -2,7 +2,7 @@
 
 scratch_out_dir="out/richard/from-scratch" &&
 
-python data/shakespeare/prepare.py &&
+python data/shakespeare_char/prepare.py &&
 
 mkdir -p "$scratch_out_dir/out-shakespeare-char-8-bit" &&
 
