@@ -19,8 +19,8 @@ batch_size = 32
 block_size = 256 # context of up to 256 previous characters
 
 # baby GPT model :)
-n_layer = 3
-n_head = 3
+n_layer = 12
+n_head = 12
 n_embd = 384
 dropout = 0.2
 
