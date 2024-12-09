@@ -17,3 +17,7 @@ moe-out-shakespeare-char
 mxfp4_kernel/conda
 mxfp4_kernel/build
 mxfp4_kernel/mxfp4Quant.egg-info/
+
+mxfp8_kernel/conda
+mxfp8_kernel/build
+mxfp8_kernel/mxfp4Quant.egg-info/
